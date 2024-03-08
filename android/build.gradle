@@ -55,5 +55,4 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
     implementation("androidx.multidex:multidex:2.0.1")
     implementation "com.google.android.exoplayer:exoplayer-core:2.11.1"
-    implementation 'androidx.core:core:1.12.0'
 }
