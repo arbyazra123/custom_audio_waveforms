@@ -4,9 +4,14 @@ import android.content.Context
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.MediaItem
+import com.google.android.exoplayer2.ExoPlayerFactory
 import com.google.android.exoplayer2.Player
+import com.google.android.exoplayer2.SimpleExoPlayer
+import com.google.android.exoplayer2.source.MediaSource
+import com.google.android.exoplayer2.source.ProgressiveMediaSource
+import com.google.android.exoplayer2.upstream.DataSource
+import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory
+import com.google.android.exoplayer2.util.Util
 import io.flutter.plugin.common.MethodChannel
 import java.lang.Exception
 
@@ -19,8 +24,8 @@ class AudioPlayer(
     private var runnable: Runnable? = null
     private var methodChannel = channel
     private var appContext = context
-    private var player: ExoPlayer? = null
-    private var playerListener: Player.Listener? = null
+    private var player: SimpleExoPlayer? = null
+    private var playerListener: Player.EventListener? = null
     private var isPlayerPrepared: Boolean = false
     private var finishMode = FinishMode.Stop
     private var key = playerKey
@@ -35,25 +40,30 @@ class AudioPlayer(
         if (path != null) {
             updateFrequency = frequency
             val uri = Uri.parse(path)
-            val mediaItem = MediaItem.fromUri(uri)
-            player = ExoPlayer.Builder(appContext).build()
-            player?.addMediaItem(mediaItem)
-            player?.prepare()
-            playerListener = object : Player.Listener {
-                override fun onPlayerStateChanged(isReady: Boolean, state: Int) {
+            val dataSourceFactory: DataSource.Factory = DefaultDataSourceFactory(
+                appContext,
+                Util.getUserAgent(appContext, "ExoPlayer")
+            )
+            val mediaSource: MediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
+                .createMediaSource(uri)
+
+            player = ExoPlayerFactory.newSimpleInstance(appContext)
+            player?.prepare(mediaSource)
+            playerListener = object : Player.EventListener {
+                override fun onPlayerStateChanged(playWhenReady: Boolean, playbackState: Int) {
                     if (!isPlayerPrepared) {
-                        if (state == Player.STATE_READY) {
+                        if (playbackState == Player.STATE_READY) {
                             player?.volume = volume ?: 1F
                             isPlayerPrepared = true
                             result.success(true)
                         }
                     }
-                    if (state == Player.STATE_ENDED) {
+                    if (playbackState == Player.STATE_ENDED) {
                         val args: MutableMap<String, Any?> = HashMap()
                         when (finishMode) {
                             FinishMode.Loop -> {
                                 player?.seekTo(0)
-                                player?.play()
+                                player?.playWhenReady = true
                                 args[Constants.finishType] = 0
                             }
                             FinishMode.Pause -> {
@@ -103,7 +113,6 @@ class AudioPlayer(
                 this.finishMode = FinishMode.Stop
             }
             player?.playWhenReady = true
-            player?.play()
             result.success(true)
             startListening(result)
         } catch (e: Exception) {
@@ -132,20 +141,21 @@ class AudioPlayer(
         }
         isPlayerPrepared = false
         player?.stop()
+        player?.release()
+        player = null
         result.success(true)
     }
-
 
     fun pause(result: MethodChannel.Result) {
         try {
             stopListening()
-            player?.pause()
+            player?.playWhenReady = false
             result.success(true)
         } catch (e: Exception) {
             result.error(Constants.LOG_TAG, "Failed to pause the player", e.toString())
         }
-
     }
+
     fun release(result: MethodChannel.Result) {
         try {
             player?.release()
@@ -153,7 +163,6 @@ class AudioPlayer(
         } catch (e: Exception) {
             result.error(Constants.LOG_TAG, "Failed to release player resource", e.toString())
         }
-
     }
 
     fun setVolume(volume: Float?, result: MethodChannel.Result) {
@@ -170,16 +179,8 @@ class AudioPlayer(
     }
 
     fun setRate(rate: Float?, result: MethodChannel.Result) {
-        try {
-            if (rate != null) {
-                player?.setPlaybackSpeed(rate)
-                result.success(true)
-            } else {
-                result.success(false)
-            }
-        } catch (e: Exception) {
-            result.success(false)
-        }
+        // Not supported in this version of ExoPlayer
+        result.success(false)
     }
 
     private fun startListening(result: MethodChannel.Result) {
@@ -198,7 +199,6 @@ class AudioPlayer(
             }
         }
         handler.post(runnable!!)
-
     }
 
     private fun stopListening() {

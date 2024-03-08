@@ -56,4 +56,5 @@ dependencies {
     implementation("androidx.multidex:multidex:2.0.1")
     implementation "com.google.android.exoplayer:exoplayer:2.10.5"
     implementation "com.google.android.exoplayer:exoplayer-core:2.10.5"
+    implementation 'androidx.core:core:1.12.0'
 }
